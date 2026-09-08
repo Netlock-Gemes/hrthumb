@@ -7,18 +7,26 @@ A minimal bot with two features:
 
 ## Important Pyrofork/Telegram limitation
 
-The video is **never downloaded**: its existing `file_id` is reused directly
-in `send_video`, so it goes server-to-server on Telegram's side.
+The video is **never downloaded**: its existing `file_id` is decoded into a
+raw document reference and reused directly, so the video bytes never touch
+this server.
 
-However, Telegram's Bot API does **not** allow a video `thumb` to be reused
-by `file_id` — a thumbnail must be uploaded as a fresh JPEG file on every
-`send_video` call ("Thumbnails can't be reused and can be only uploaded as a
-new file"). To respect this while avoiding repeated downloads, the bot
-downloads the thumbnail **photo only** (a small image, not the video) a
-single time — when `/setthumbnail` is used — and keeps those bytes in
-memory. Every subsequent video re-uploads that same in-memory thumbnail.
-This is the closest technically correct approach: zero video downloads,
-one small one-time image download per thumbnail change.
+Telegram's underlying protocol has **no way to attach a custom thumbnail to
+a reused video reference** — the classic `thumb` field only exists on the
+"upload a new video" media type, so it's silently ignored whenever a video
+is resent by `file_id` (this was verified directly against pyrofork's
+source and Telegram's raw API schema). The closest correct equivalent for a
+*reused* video is Telegram's **video cover** field, which a reused
+reference does support, and that's what this bot sets instead — it's the
+custom image shown before playback, functionally the same as what you'd
+expect a "thumbnail" to do.
+
+The cover image itself can't be reused by `file_id` either — Telegram
+requires a fresh upload of it on every send. To satisfy that without any
+extra downloads, the bot downloads the small cover/thumbnail JPEG (not the
+video) exactly once, when `/setthumbnail` is used, and keeps those bytes in
+memory. Every subsequent video re-uploads that same in-memory image as its
+cover.
 
 The thumbnail is kept in memory only (no database, no disk). It resets if
 the bot restarts, and is overwritten each time `/setthumbnail` is used.
