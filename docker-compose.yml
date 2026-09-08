@@ -1,0 +1,7 @@
+services:
+  thumbnail-bot:
+    build: .
+    container_name: telegram-thumbnail-bot
+    env_file:
+      - .env
+    restart: unless-stopped
